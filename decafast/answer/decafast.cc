@@ -276,6 +276,23 @@ public:
   }
 };
 
+class AssignGlobalVarAST : public decafAST {
+    string name;
+    decafAST *type;
+    decafAST *init;
+public:
+    AssignGlobalVarAST(string id, decafAST *t, decafAST *val)
+        : name(id), type(t), init(val) {}
+    ~AssignGlobalVarAST() {
+        if (type) delete type;
+        if (init) delete init;
+    }
+    string str() {
+        return "AssignGlobalVar(" + name + "," + getString(type) + "," + getString(init) + ")";
+    }
+};
+
+
 class WhileStmtAST : public decafAST {
   decafAST *cond;
   decafAST *stmt;
