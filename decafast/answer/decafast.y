@@ -174,7 +174,8 @@ expr:
   | T_MINUS expr %prec UMINUS             { $$ = new UnaryMinusAST($2); }
   | T_NOT expr                            { $$ = new NotAST($2); }
   | T_LPAREN expr T_RPAREN                { $$ = $2; }
-  | T_CHARCONSTANT                        { $$ = new CharConstantAST($1); }
+  | T_CHARCONSTANT                        { $$ = new IntConstantAST((int)$1); }
+
 ;
 
 %%

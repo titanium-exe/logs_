@@ -95,8 +95,9 @@ public:
 	FieldDeclAST(string name, decafAST *type) : Name(name), Type(type) {}
 	~FieldDeclAST() { if (Type != NULL) delete Type; }
 	string str() {
-		return string("FieldDecl") + "(" + Name + "," + getString(Type) + ")";
+    return string("VarDef") + "(" + Name + "," + getString(Type) + ")";
 	}
+
 };
 
 class VoidTypeAST : public decafAST {
@@ -108,18 +109,39 @@ class VariableAST : public decafAST {
 	string Name;
 public:
 	VariableAST(string name) : Name(name) {}
+	string getName() { return Name; }
 	string str() { return string("VariableExpr") + "(" + Name + ")"; }
 };
 
+// class AssignAST : public decafAST {
+// 	decafAST *LHS, *RHS;
+// public:
+// 	AssignAST(decafAST *lhs, decafAST *rhs) : LHS(lhs), RHS(rhs) {}
+// 	~AssignAST() { if (LHS) delete LHS; if (RHS) delete RHS; }
+// 	string str() {
+// 		return string("AssignVar") + "(" + getString(LHS) + "," + getString(RHS) + ")";
+// 	}
+// };
+
 class AssignAST : public decafAST {
-	decafAST *LHS, *RHS;
+	string Name;
+	decafAST *Expr;
 public:
-	AssignAST(decafAST *lhs, decafAST *rhs) : LHS(lhs), RHS(rhs) {}
-	~AssignAST() { if (LHS) delete LHS; if (RHS) delete RHS; }
+	AssignAST(decafAST *lval, decafAST *expr) : Expr(expr) {
+		VariableAST *v = dynamic_cast<VariableAST *>(lval);
+		if (v != NULL) {
+			Name = v->getName();
+			delete v;
+		}
+	}
+	~AssignAST() {
+		if (Expr != NULL) delete Expr;
+	}
 	string str() {
-		return string("AssignVar") + "(" + getString(LHS) + "," + getString(RHS) + ")";
+		return string("AssignVar") + "(" + Name + "," + getString(Expr) + ")";
 	}
 };
+
 
 class MethodBlockAST : public decafAST {
     decafStmtList *varList;
