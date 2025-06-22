@@ -79,6 +79,7 @@ using namespace std;
 %type <ast> vardecl vardecl_list
 %type <ast> param_list param param_list_opt
 %type <ast> methodcall arg_list arg_list_opt
+%type <ast>  type 
 %type <slst> id_list 
 
 
@@ -129,12 +130,15 @@ fielddecl
       }
     ;
 
+
 stmt:
       assign T_SEMICOLON                 { $$ = $1; }
     | methodcall T_SEMICOLON             { $$ = $1; }
     | block                              { $$ = $1; }
     | T_WHILE T_LPAREN expr T_RPAREN stmt
         { $$ = new WhileStmtAST($3, $5); }
+    | T_FOR T_LPAREN assign T_SEMICOLON expr T_SEMICOLON assign T_RPAREN stmt
+        { $$ = new ForStmtAST($3, $5, $7, $9); }
     | T_IF T_LPAREN expr T_RPAREN stmt            %prec LOWER_THAN_ELSE
         { $$ = new IfStmtAST($3, $5, nullptr); }
     | T_IF T_LPAREN expr T_RPAREN stmt T_ELSE stmt
@@ -147,7 +151,9 @@ stmt:
         { $$ = new BreakStmtAST(); }
     | T_CONTINUE T_SEMICOLON                     
         { $$ = new ContinueStmtAST(); }
-    ;
+;
+
+
 
 
 methodcall
@@ -197,14 +203,27 @@ methoddecl
       }
     ;
 
+
 rettype:
-      T_VOID { $$ = new VoidTypeAST(); }
-    | T_INTTYPE { $$ = new IntTypeAST(); }
+    T_VOID      { $$ = new VoidTypeAST(); }
+  | T_INTTYPE   { $$ = new IntTypeAST(); }
+  | T_BOOLTYPE  { $$ = new BoolTypeAST(); }
 ;
 
-block:
-    T_LCB stmt_list T_RCB { $$ = new BlockAST(new decafStmtList(), (decafStmtList *)$2); }
+
+type
+    : T_INTTYPE   { $$ = new IntTypeAST();  }
+    | T_BOOLTYPE  { $$ = new BoolTypeAST(); }
+    
 ;
+
+
+block:
+    T_LCB vardecl_list stmt_list T_RCB { $$ = new BlockAST((decafStmtList *)$2, (decafStmtList *)$3); }
+;
+
+
+
 
 
 vardecl_list
@@ -213,15 +232,24 @@ vardecl_list
 ;
 
 vardecl
-    : T_VAR id_list T_INTTYPE T_SEMICOLON
-      {
-          decafStmtList *lst = new decafStmtList();
-          for (auto &name : *$2)
-              lst->push_back(new VarDeclAST(name, new IntTypeAST()));
-          delete $2;
-          $$ = lst;
-      }
-    ;
+    : T_VAR id_list T_INTTYPE T_SEMICOLON {
+        decafStmtList *lst = new decafStmtList();
+        for (auto &name : *$2)
+            lst->push_back(new VarDeclAST(name, new IntTypeAST()));
+        delete $2;
+        $$ = lst;
+    }
+    | T_VAR id_list T_BOOLTYPE T_SEMICOLON {
+        decafStmtList *lst = new decafStmtList();
+        for (auto &name : *$2)
+            lst->push_back(new VarDeclAST(name, new BoolTypeAST()));
+        delete $2;
+        $$ = lst;
+    }
+;
+
+
+
 
 extern_list
     : /* empty */                           { $$ = new decafStmtList(); }
