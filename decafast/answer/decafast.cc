@@ -88,6 +88,16 @@ public:
 	string str() { return string("IntType"); }
 };
 
+class BoolTypeAST : public decafAST {
+public:
+    string str() { return "BoolType"; }
+};
+
+class StringTypeAST : public decafAST {
+public:
+    string str() { return "StringType"; }
+};
+
 class FieldDeclAST : public decafAST {
 	string Name;
 	decafAST *Type;
@@ -166,6 +176,18 @@ public:
 	string str() {
 		return string("Method") + "(" + Name + "," + getString(ReturnType) + "," + getString(Args) + "," + getString(Block) + ")";
 	}
+};
+
+class MethodCallAST : public decafAST {
+    string                name;
+    decafStmtList        *args;
+public:
+    MethodCallAST(const string &n, decafStmtList *a)
+        : name(n), args(a) {}
+    ~MethodCallAST() { if (args) delete args; }
+    string str() {
+        return "MethodCall(" + name + "," + getString(args) + ")";
+    }
 };
 
 // Expression ASTs
@@ -258,6 +280,36 @@ class BreakStmtAST : public decafAST {
 public:
     string str() { return "BreakStmt"; }
 };
+
+class ExternFunctionAST : public decafAST {
+    string name;
+    decafAST *rettype;
+    decafStmtList *params;
+public:
+    ExternFunctionAST(string n, decafAST *rtype, decafStmtList *p) 
+        : name(n), rettype(rtype), params(p) {}
+
+    ~ExternFunctionAST() {
+        if (rettype) delete rettype;
+        if (params) delete params;
+    }
+
+    string str() {
+        return "ExternFunction(" + name + "," + getString(rettype) + "," + getString(params) + ")";
+    }
+};
+
+class VarDefAST : public decafAST {
+    string name;
+    decafAST *type;
+public:
+    VarDefAST(string n, decafAST *t) : name(n), type(t) {}
+    ~VarDefAST() { if (type) delete type; }
+    string str() {
+        return "VarDef(" + name + "," + getString(type) + ")";
+    }
+};
+
 
 
 

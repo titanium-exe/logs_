@@ -61,11 +61,16 @@ using namespace std;
 %left T_MULT T_DIV T_MOD
 %right UMINUS T_NOT
 
-
-%type <ast> extern_list decafpackage fielddecl_list fielddecl
-%type <ast> stmt_list stmt assign lvalue block expr
+%type <ast> extern_list extern_decl
+%type <ast> extern_typelist extern_typelist_opt extern_type
+%type <ast> decafpackage fielddecl_list fielddecl
 %type <ast> methoddecl methoddecl_list rettype
+%type <ast> stmt_list stmt assign lvalue block expr
 %type <ast> vardecl vardecl_list
+%type <ast> param_list param param_list_opt
+%type <ast> methodcall arg_list arg_list_opt
+
+
 
 %%
 
@@ -79,10 +84,6 @@ program: extern_list decafpackage
 		}
         delete prog;
     }
-
-extern_list: /* extern_list can be empty */
-    { decafStmtList *slist = new decafStmtList(); $$ = slist; }
-    ;
 
 decafpackage:
     T_PACKAGE T_ID T_LCB fielddecl_list methoddecl_list T_RCB {
@@ -104,6 +105,7 @@ fielddecl:
 
 stmt:
     assign T_SEMICOLON           { $$ = $1; }
+  | methodcall T_SEMICOLON          { $$ = $1; }  
   | block                        { $$ = $1; }
   | T_WHILE T_LPAREN expr T_RPAREN stmt {
         $$ = new WhileStmtAST($3, $5);
@@ -113,7 +115,23 @@ stmt:
     }
 ;
 
+methodcall
+    : T_ID T_LPAREN arg_list_opt T_RPAREN
+        {
+            $$ = new MethodCallAST(*$1,(decafStmtList*)$3);
+            delete $1;
+        }
+;
 
+arg_list_opt
+    : /* ε */                         { $$ = new decafStmtList(); }
+    | arg_list                        { $$ = $1; }
+;
+
+arg_list
+    : expr                            { auto l=new decafStmtList(); l->push_back($1); $$ = l; }
+    | arg_list T_COMMA expr           { ((decafStmtList*)$1)->push_back($3); $$ = $1; }
+;
 
 assign
     : lvalue T_ASSIGN expr { $$ = new AssignAST($1, $3); }
@@ -162,9 +180,64 @@ vardecl:
     }
 ;
 
+extern_list
+    : /* empty */                           { $$ = new decafStmtList(); }
+    | extern_list extern_decl               { ((decafStmtList *)$1)->push_back($2); $$ = $1; }
+;
+
+extern_decl
+    : T_EXTERN T_FUNC T_ID
+      T_LPAREN extern_typelist_opt T_RPAREN
+      rettype T_SEMICOLON
+        {
+            $$ = new ExternFunctionAST(*$3, $7, (decafStmtList *)$5);
+            delete $3;
+        }
+;
+
+extern_typelist_opt
+    : /* empty */                     { $$ = new decafStmtList(); }
+    | extern_typelist                 { $$ = $1; }
+;
+
+extern_typelist
+    : extern_type                     {
+          auto lst = new decafStmtList();
+          lst->push_back($1); $$ = lst;
+      }
+    | extern_typelist T_COMMA extern_type {
+          ((decafStmtList *)$1)->push_back($3); $$ = $1;
+      }
+;
+
+
+extern_type
+    : T_STRINGTYPE                    { $$ = new StringTypeAST(); }
+    | T_INTTYPE                       { $$ = new IntTypeAST(); }
+    | T_BOOLTYPE                      { $$ = new BoolTypeAST(); }
+;
+
+
+param_list_opt
+    : /* empty */                    { $$ = new decafStmtList(); }
+    | param_list                     { $$ = $1; }
+;
+
+param_list
+    : param                          { auto lst=new decafStmtList(); lst->push_back($1); $$ = lst; }
+    | param_list T_COMMA param       { ((decafStmtList*)$1)->push_back($3); $$ = $1; }
+;
+
+param
+    : T_ID T_INTTYPE                     { $$ = new VarDefAST(*$1,new IntTypeAST()); delete $1; }
+;
+
+
+
 
 expr:
-    T_INTCONSTANT                         { $$ = new IntConstantAST($1); }
+   methodcall                      { $$ = $1; }    
+  | T_INTCONSTANT                         { $$ = new IntConstantAST($1); }
   | T_ID                                  { $$ = new VariableAST(*$1); delete $1; }
   | expr T_PLUS expr                      { $$ = new PlusAST($1, $3); }
   | expr T_MINUS expr                     { $$ = new MinusAST($1, $3); }
