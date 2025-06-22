@@ -113,15 +113,7 @@ public:
 	string str() { return string("VariableExpr") + "(" + Name + ")"; }
 };
 
-// class AssignAST : public decafAST {
-// 	decafAST *LHS, *RHS;
-// public:
-// 	AssignAST(decafAST *lhs, decafAST *rhs) : LHS(lhs), RHS(rhs) {}
-// 	~AssignAST() { if (LHS) delete LHS; if (RHS) delete RHS; }
-// 	string str() {
-// 		return string("AssignVar") + "(" + getString(LHS) + "," + getString(RHS) + ")";
-// 	}
-// };
+
 
 class AssignAST : public decafAST {
 	string Name;
@@ -225,6 +217,48 @@ public:
     ~VarDeclAST() { if (type) delete type; }
     string str() { return "VarDecl(" + name + "," + getString(type) + ")"; }
 };
+
+class BoolConstantAST : public decafAST {
+    bool Value;
+public:
+    BoolConstantAST(bool val) : Value(val) {}
+    string str() { return string("BoolExpr(") + (Value ? "True" : "False") + ")"; }
+};
+
+class BlockAST : public decafAST {
+    decafStmtList* varDecls;
+    decafStmtList* stmts;
+public:
+    BlockAST(decafStmtList* decls, decafStmtList* stmts)
+        : varDecls(decls), stmts(stmts) {}
+    ~BlockAST() {
+        if (varDecls) delete varDecls;
+        if (stmts) delete stmts;
+    }
+    string str() {
+        return "Block(" + getString(varDecls) + "," + getString(stmts) + ")";
+    }
+};
+
+class WhileStmtAST : public decafAST {
+    decafAST *cond;
+    decafAST *stmt;
+public:
+    WhileStmtAST(decafAST *c, decafAST *s) : cond(c), stmt(s) {}
+    ~WhileStmtAST() {
+        if (cond) delete cond;
+        if (stmt) delete stmt;
+    }
+    string str() {
+        return "WhileStmt(" + getString(cond) + "," + getString(stmt) + ")";
+    }
+};
+
+class BreakStmtAST : public decafAST {
+public:
+    string str() { return "BreakStmt"; }
+};
+
 
 
 // Binary operations

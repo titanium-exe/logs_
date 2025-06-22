@@ -102,9 +102,18 @@ fielddecl:
         { $$ = new FieldDeclAST(*$2, new IntTypeAST()); delete $2; }
     ;
 
-stmt
-    : assign T_SEMICOLON { $$ = $1; }
-    ;
+stmt:
+    assign T_SEMICOLON           { $$ = $1; }
+  | block                        { $$ = $1; }
+  | T_WHILE T_LPAREN expr T_RPAREN stmt {
+        $$ = new WhileStmtAST($3, $5);
+    }
+  | T_BREAK T_SEMICOLON {
+        $$ = new BreakStmtAST();
+    }
+;
+
+
 
 assign
     : lvalue T_ASSIGN expr { $$ = new AssignAST($1, $3); }
@@ -137,9 +146,10 @@ rettype:
     | T_INTTYPE { $$ = new IntTypeAST(); }
 ;
 
-block
-    : T_LCB stmt_list T_RCB { $$ = $2; }
-    ;
+block:
+    T_LCB stmt_list T_RCB { $$ = new BlockAST(new decafStmtList(), (decafStmtList *)$2); }
+;
+
 
 vardecl_list:
       /* empty */ { $$ = new decafStmtList(); }
@@ -175,6 +185,9 @@ expr:
   | T_NOT expr                            { $$ = new NotAST($2); }
   | T_LPAREN expr T_RPAREN                { $$ = $2; }
   | T_CHARCONSTANT                        { $$ = new IntConstantAST((int)$1); }
+  | T_TRUE                                { $$ = new BoolConstantAST(true); }
+  | T_FALSE                               { $$ = new BoolConstantAST(false); }
+
 
 ;
 
