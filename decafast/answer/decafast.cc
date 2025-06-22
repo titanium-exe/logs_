@@ -38,21 +38,29 @@ string commaList(list<T> vec) {
     return s;
 }
 
-/// decafStmtList - List of Decaf statements
+/// decafStmtList – list of AST nodes
 class decafStmtList : public decafAST {
-	list<decafAST *> stmts;
+    std::list<decafAST *> stmts;
 public:
-	decafStmtList() {}
-	~decafStmtList() {
-		for (list<decafAST *>::iterator i = stmts.begin(); i != stmts.end(); i++) { 
-			delete *i;
-		}
-	}
-	int size() { return stmts.size(); }
-	void push_front(decafAST *e) { stmts.push_front(e); }
-	void push_back(decafAST *e) { stmts.push_back(e); }
-	string str() { return commaList<class decafAST *>(stmts); }
+    decafStmtList() {}
+    ~decafStmtList() {
+        for (auto *p : stmts) delete p;
+    }
+
+    /* ---------- helpers ---------- */
+    int  size()        { return stmts.size(); }
+    void push_front(decafAST *e) { stmts.push_front(e); }
+    void push_back (decafAST *e) { stmts.push_back (e); }
+
+    /**  NEW: splice another decafStmtList into this one  */
+    void merge(decafStmtList *other) {
+        if (!other) return;               // safety check
+        stmts.splice(stmts.end(), other->stmts);
+    }
+
+    string str() { return commaList<decafAST *>(stmts); }
 };
+
 
 class PackageAST : public decafAST {
 	string Name;
@@ -105,8 +113,8 @@ public:
 	FieldDeclAST(string name, decafAST *type) : Name(name), Type(type) {}
 	~FieldDeclAST() { if (Type != NULL) delete Type; }
 	string str() {
-    return string("VarDef") + "(" + Name + "," + getString(Type) + ")";
-	}
+        return "FieldDecl(" + Name + "," + getString(Type) + ",Scalar)";
+    }
 
 };
 
@@ -237,7 +245,10 @@ class VarDeclAST : public decafAST {
 public:
     VarDeclAST(string id, decafAST *t) : name(id), type(t) {}
     ~VarDeclAST() { if (type) delete type; }
-    string str() { return "VarDecl(" + name + "," + getString(type) + ")"; }
+    string str() {
+        return "VarDef(" + name + "," + getString(type) + ")";
+    }
+
 };
 
 class BoolConstantAST : public decafAST {
@@ -279,6 +290,34 @@ public:
 class BreakStmtAST : public decafAST {
 public:
     string str() { return "BreakStmt"; }
+};
+
+class ContinueStmtAST : public decafAST {
+public:
+    string str() { return "ContinueStmt"; }
+};
+
+
+
+class IfStmtAST : public decafAST {
+    decafAST *cond, *thenBlk, *elseBlk;          // elseBlk == nullptr ⇢ “no else”
+public:
+    IfStmtAST(decafAST *c, decafAST *t, decafAST *e)
+        : cond(c), thenBlk(t), elseBlk(e) {}
+    ~IfStmtAST() { delete cond; delete thenBlk; delete elseBlk; }
+    string str() {
+        return "IfStmt(" + getString(cond) + "," +
+                           getString(thenBlk) + "," +
+                           getString(elseBlk) + ")";
+    }
+};
+
+class ReturnStmtAST : public decafAST {
+    decafAST *value;                 // nullptr ⇢ “return;”
+public:
+    ReturnStmtAST(decafAST *v) : value(v) {}
+    ~ReturnStmtAST() { delete value; }
+    string str() { return "ReturnStmt(" + getString(value) + ")"; }
 };
 
 class ExternFunctionAST : public decafAST {
