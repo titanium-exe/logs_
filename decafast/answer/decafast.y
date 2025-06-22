@@ -26,12 +26,14 @@ using namespace std;
 
 %define parse.error verbose
 
+
+
 %union{
-    class decafAST *ast;
-    std::string    *sval;
-    std::list<std::string> *slst;   /* NEW – a list of ids */
-    int ival;
-    char cval;
+    class decafAST         *ast;
+    std::string            *sval;      /* ← T_STRINGCONSTANT uses this   */
+    std::list<std::string> *slst;
+    int                     ival;
+    char                    cval;
 }
 
 
@@ -78,6 +80,7 @@ using namespace std;
 %type <ast> param_list param param_list_opt
 %type <ast> methodcall arg_list arg_list_opt
 %type <slst> id_list 
+
 
 
 
@@ -250,12 +253,12 @@ extern_typelist
       }
 ;
 
-
 extern_type
-    : T_STRINGTYPE                    { $$ = new StringTypeAST(); }
-    | T_INTTYPE                       { $$ = new IntTypeAST(); }
-    | T_BOOLTYPE                      { $$ = new BoolTypeAST(); }
+    : T_STRINGTYPE  { $$ = new TypeOnlyVarDefAST(new StringTypeAST()); }
+    | T_INTTYPE     { $$ = new TypeOnlyVarDefAST(new IntTypeAST());   }
+    | T_BOOLTYPE    { $$ = new TypeOnlyVarDefAST(new BoolTypeAST());  }
 ;
+
 
 param_list_opt
     : param_list                     { $$ = $1; }
@@ -284,6 +287,7 @@ param
 expr:
    methodcall                      { $$ = $1; }    
   | T_INTCONSTANT                         { $$ = new IntConstantAST($1); }
+  | T_STRINGCONSTANT                        { $$ = new StringConstantAST(*$1); delete $1; }
   | T_ID                                  { $$ = new VariableAST(*$1); delete $1; }
   | expr T_PLUS expr                      { $$ = new PlusAST($1, $3); }
   | expr T_MINUS expr                     { $$ = new MinusAST($1, $3); }

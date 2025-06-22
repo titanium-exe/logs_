@@ -239,6 +239,23 @@ public:
     string str() { return "CharExpr(" + string(1, val) + ")"; }
 };
 
+class StringConstantAST : public decafAST {
+    std::string val;                 
+public:
+    explicit StringConstantAST(const std::string &v) : val(v) {}
+    std::string str() { return "StringConstant(" + val + ")"; }
+};
+
+class TypeOnlyVarDefAST : public decafAST {
+    decafAST *type;
+public:
+    explicit TypeOnlyVarDefAST(decafAST *t) : type(t) {}
+    ~TypeOnlyVarDefAST() { delete type; }
+    std::string str() { return "VarDef(" + getString(type) + ")"; }
+};
+
+
+
 class VarDeclAST : public decafAST {
     string name;
     decafAST *type;
