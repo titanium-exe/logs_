@@ -96,14 +96,66 @@ public:
 };
 
 class FieldDeclAST : public decafAST {
-  string Name;
-  decafAST *Type;
+    std::string Name;  decafAST *Type;  int len;       // len<0 ⇢ scalar
 public:
-  FieldDeclAST(string name, decafAST *type) : Name(name), Type(type) {}
-  ~FieldDeclAST() { delete Type; }
-  string str() { return "FieldDecl(" + Name + "," + getString(Type) + ",Scalar)"; }
+    FieldDeclAST(std::string n, decafAST *t, int l=-1)
+        : Name(n), Type(t), len(l) {}
+    ~FieldDeclAST() { delete Type; }
+    std::string str() {
+        std::string tail = (len<0 ? "Scalar"
+                                  : "Array(" + std::to_string(len) + ")");
+        return "FieldDecl(" + Name + "," + getString(Type) + "," + tail + ")";
+    }
 };
 
+class FieldDeclArrayAST : public decafAST {
+    std::string Name;
+    decafAST   *Type;
+    int         Size;
+public:
+    FieldDeclArrayAST(const std::string &n, decafAST *t, int sz)
+        : Name(n), Type(t), Size(sz) {}
+    ~FieldDeclArrayAST() { delete Type; }
+    std::string str() {
+        std::ostringstream os;
+        os << "FieldDecl(" << Name << "," << getString(Type)
+           << ",Array(" << Size << "))";
+        return os.str();
+    }
+};
+
+class ArrayLocExprAST : public decafAST {
+    std::string name;  decafAST *index;
+public:
+    ArrayLocExprAST(const std::string &n, decafAST *idx)
+        : name(n), index(idx) {}
+    ~ArrayLocExprAST() { delete index; }
+    std::string str() {
+        return "ArrayLocExpr(" + name + "," + getString(index) + ")";
+    }
+};
+
+class AssignArrayLocAST : public decafAST {
+    std::string name;  decafAST *index;  decafAST *expr;
+public:
+    AssignArrayLocAST(const std::string &n, decafAST *idx, decafAST *e)
+        : name(n), index(idx), expr(e) {}
+    ~AssignArrayLocAST() { delete index; delete expr; }
+    std::string str() {
+        return "AssignArrayLoc(" + name + "," +
+               getString(index) + "," + getString(expr) + ")";
+    }
+};
+
+
+
+class ArrayFieldDeclAST : public FieldDeclAST {
+public:
+    using FieldDeclAST::FieldDeclAST;   // inherit ctor
+    std::string str() {                 // only the tag differs
+        return "ArrayFieldDecl" + FieldDeclAST::str().substr(10);
+    }
+};
 class VoidTypeAST : public decafAST {
 public:
   string str() { return string("VoidType"); }
@@ -124,7 +176,7 @@ public:
   AssignAST(decafAST *lval, decafAST *expr) : Expr(expr) {
     VariableAST *v = dynamic_cast<VariableAST *>(lval);
     Name = v ? v->getName() : "";
-    delete lval;  // always delete lval once it's cast and used
+    delete lval;  
   }
   ~AssignAST() {
     delete Expr;

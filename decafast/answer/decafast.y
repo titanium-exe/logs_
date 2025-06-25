@@ -64,8 +64,8 @@ using namespace std;
 %left T_AND
 %left T_EQ T_NEQ
 %left T_LT T_GT T_LEQ T_GEQ
-%left T_LEFTSHIFT T_RIGHTSHIFT
 %left T_PLUS T_MINUS
+%left T_LEFTSHIFT T_RIGHTSHIFT
 %left T_MULT T_DIV T_MOD
 %right UMINUS T_NOT
 %nonassoc LOWER_THAN_ELSE   
@@ -80,7 +80,7 @@ using namespace std;
 %type <ast> param_list param param_list_opt
 %type <ast> methodcall arg_list arg_list_opt
 %type <ast>  type 
-%type <slst> id_list 
+%type <slst> id_list
 
 
 
@@ -120,14 +120,51 @@ id_list
 
 
 fielddecl
+   
     : T_VAR id_list T_INTTYPE T_SEMICOLON
       {
           decafStmtList *lst = new decafStmtList();
           for (auto &name : *$2)
               lst->push_back(new FieldDeclAST(name, new IntTypeAST()));
           delete $2;
-          $$ = lst;                /* return the whole list */
+          $$ = lst;               
       }
+      | T_VAR id_list T_INTTYPE T_ASSIGN expr T_SEMICOLON
+      {
+          std::string name = $2->front();
+          auto lst = new decafStmtList();
+          lst->push_back(new AssignGlobalVarAST(name,new IntTypeAST(),$5));
+          delete $2;
+          $$ = lst;
+      }
+      | T_VAR T_INTTYPE id_list T_SEMICOLON
+      {
+          auto lst = new decafStmtList();
+          for (const auto &name : *$3)
+              lst->push_back(new FieldDeclAST(name, new IntTypeAST()));
+          delete $3;
+          $$ = lst;
+      }
+
+
+
+      | T_VAR id_list T_LSB T_INTCONSTANT T_RSB T_INTTYPE T_SEMICOLON
+      {
+      auto lst = new decafStmtList();
+      for (const auto &name : *$2)
+          lst->push_back(new FieldDeclAST(name,
+                                          new IntTypeAST(),$4));  
+      delete $2;
+      $$ = lst;
+  }
+
+    | T_VAR T_ID T_LSB T_INTCONSTANT T_RSB T_INTTYPE T_SEMICOLON
+        {
+            auto lst = new decafStmtList();
+            lst->push_back( new FieldDeclAST(*$2, new IntTypeAST(), $4) );
+            delete $2;
+            $$ = lst;
+        }
     ;
 
 
@@ -144,6 +181,8 @@ stmt:
     | T_IF T_LPAREN expr T_RPAREN stmt T_ELSE stmt
         { $$ = new IfStmtAST($3, $5, $7); }
     | T_RETURN T_SEMICOLON
+        { $$ = new ReturnStmtAST(nullptr); }
+        | T_RETURN T_LPAREN T_RPAREN T_SEMICOLON 
         { $$ = new ReturnStmtAST(nullptr); }
     | T_RETURN T_LPAREN expr T_RPAREN T_SEMICOLON
         { $$ = new ReturnStmtAST($3); }
@@ -175,11 +214,16 @@ arg_list
 ;
 
 assign
-    : lvalue T_ASSIGN expr { $$ = new AssignAST($1, $3); }
+    : T_ID                T_ASSIGN expr
+          { $$ = new AssignAST        (new VariableAST(*$1),       $3); delete $1; }
+   | T_ID T_LSB expr T_RSB T_ASSIGN expr
+         { $$ = new AssignArrayLocAST(*$1,               $3,      $6); delete $1; }
+ ;
     ;
 
 lvalue
-    : T_ID { $$ = new VariableAST(*$1); delete $1; }
+     : T_ID T_LSB expr T_RSB         { $$ = new ArrayLocExprAST(*$1,$3); delete $1; }
+    | T_ID                          { $$ = new VariableAST(*$1); delete $1; }
     ;
 
 stmt_list
@@ -211,8 +255,8 @@ rettype:
 ;
 
 
-type
-    : T_INTTYPE   { $$ = new IntTypeAST();  }
+type:
+     T_INTTYPE   { $$ = new IntTypeAST();  }
     | T_BOOLTYPE  { $$ = new BoolTypeAST(); }
     
 ;
@@ -239,6 +283,14 @@ vardecl
         delete $2;
         $$ = lst;
     }
+    | T_VAR T_INTTYPE id_list T_SEMICOLON
+      {
+          auto lst = new decafStmtList();
+          for (const auto &name : *$3)
+              lst->push_back(new VarDeclAST(name, new IntTypeAST()));
+          delete $3;
+          $$ = lst;
+      }
     | T_VAR id_list T_BOOLTYPE T_SEMICOLON {
         decafStmtList *lst = new decafStmtList();
         for (auto &name : *$2)
@@ -266,8 +318,8 @@ extern_decl
         }
 ;
 
-extern_typelist_opt
-    : /* empty */                     { $$ = new decafStmtList(); }
+extern_typelist_opt:
+    /* empty */                     { $$ = new decafStmtList(); }
     | extern_typelist                 { $$ = $1; }
 ;
 
@@ -285,6 +337,7 @@ extern_type
     : T_STRINGTYPE  { $$ = new TypeOnlyVarDefAST(new StringTypeAST()); }
     | T_INTTYPE     { $$ = new TypeOnlyVarDefAST(new IntTypeAST());   }
     | T_BOOLTYPE    { $$ = new TypeOnlyVarDefAST(new BoolTypeAST());  }
+    | T_VOID        { $$ = new TypeOnlyVarDefAST(new VoidTypeAST()); } 
 ;
 
 
@@ -313,9 +366,11 @@ param
 
 
 expr:
-   methodcall                      { $$ = $1; }    
+
+  methodcall                      { $$ = $1; }    
   | T_INTCONSTANT                         { $$ = new IntConstantAST($1); }
   | T_STRINGCONSTANT                        { $$ = new StringConstantAST(*$1); delete $1; }
+  | T_ID T_LSB expr T_RSB         { $$ = new ArrayLocExprAST(*$1,$3); delete $1; }
   | T_ID                                  { $$ = new VariableAST(*$1); delete $1; }
   | expr T_PLUS expr                      { $$ = new PlusAST($1, $3); }
   | expr T_MINUS expr                     { $$ = new MinusAST($1, $3); }
@@ -339,8 +394,8 @@ expr:
   | T_TRUE                                { $$ = new BoolConstantAST(true); }
   | T_FALSE                               { $$ = new BoolConstantAST(false); }
 
-
 ;
+
 
 %%
 
@@ -349,4 +404,3 @@ int main() {
   int retval = yyparse();
   return(retval >= 1 ? EXIT_FAILURE : EXIT_SUCCESS);
 }
-

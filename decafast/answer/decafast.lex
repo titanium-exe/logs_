@@ -104,7 +104,34 @@ null            { tokenpos+=yyleng; return T_NULL; }
 
 
 {DIGIT}        { yylval.ival = atoi(yytext);          tokenpos+=yyleng; return T_INTCONSTANT; }
-{CHAR_CONST}   { yylval.cval = yytext[1];             tokenpos+=yyleng; return T_CHARCONSTANT; }
+{CHAR_CONST}  {
+    char c;
+    if (yytext[1] == '\\') {           /* it is an escape sequence */
+        switch (yytext[2]) {
+            case 'n': c = '\n'; break; /* 10 */
+            case 't': c = '\t'; break; /*  9 */
+            case 'v': c = '\v'; break; /* 11 */
+            case 'r': c = '\r'; break; /* 13 */
+            case 'a': c = '\a'; break; /*  7 */
+            case 'f': c = '\f'; break; /* 12 */
+            case 'b': c = '\b'; break; /*  8 */
+            case '\\': c = '\\'; break;/* 92 */
+            case '\'': c = '\''; break;/* 39 */
+            case '\"': c = '\"'; break;/* 34 */
+            /* add octal/hex escapes here if you support them */
+            default:
+                fprintf(stderr, "bad escape in char constant\n");
+                c = yytext[2];          /* fallback */
+        }
+    } else {
+        c = yytext[1];                  /* ordinary char literal    */
+    }
+
+    yylval.cval = c;
+    tokenpos += yyleng;
+    return T_CHARCONSTANT;
+}
+
 {STRING_CONST} { yylval.sval = new string(yytext);    tokenpos+=yyleng; return T_STRINGCONSTANT; }
 {ID}           { yylval.sval = new string(yytext);    tokenpos+=yyleng; return T_ID; }
 
