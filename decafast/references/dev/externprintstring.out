@@ -1,1 +1,0 @@
-Program(ExternFunction(print_string,VoidType,VarDef(StringType)),Package(Test,None,Method(main,VoidType,None,MethodBlock(VarDef(x,IntType),AssignVar(x,NumberExpr(1))))))

@@ -1,1 +1,0 @@
-Program(None,Package(C,None,Method(f,VoidType,None,MethodBlock(None,AssignVar(x,NumberExpr(1))))))

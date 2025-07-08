@@ -1,7 +1,0 @@
-package Test {
-	func test() int {
-		return ('x');
-	}
-	func main() int {
-	}
-}

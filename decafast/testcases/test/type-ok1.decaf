@@ -1,9 +1,0 @@
-package C {
-	var int x ;
-	var int y ;
-	var int z ;
-
-    func main() void {
-        print_string("");
-	}
-}

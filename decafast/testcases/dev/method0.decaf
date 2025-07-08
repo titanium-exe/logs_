@@ -1,6 +1,0 @@
-package QuickSort {
-	var x int;
-
-	func main() void {
-	}
-}
