@@ -402,7 +402,7 @@ public:
       if (!gSym.insert(name, dtype, getLine())) {
           std::cerr << "Error: variable '" << name
                     << "' redeclared (line " << getLine() << ")\n";
-      } else {                                    // NEW ↓
+      } else {                                   
           std::cerr << "defined variable: " << name
                     << ", with type: "  << typeToString(dtype)
                     << ", on line number: " << getLine() << '\n';
@@ -579,7 +579,8 @@ public:
 class MethodCallAST : public decafAST {
     std::string    name;
     decafStmtList *args;
-    int declLine = -1;                      
+    int declLine = -1;    
+    int argLine = -1;                  
 public:
     MethodCallAST(const std::string& n,
                   decafStmtList*     a,
@@ -589,12 +590,24 @@ public:
 
     ~MethodCallAST() { delete args; }
     void Analyze() override {
+        // store function line (still useful for error checking)
         if (auto *sym = gSym.lookup(name))
             declLine = sym->lineDeclared;
-        else
-            std::cerr << "Error: function '" << name
-                      << "' not declared (line " << getLine() << ")\n";
-        if (args) args->Analyze();
+
+        // analyse arguments and remember first variable/array argument line
+        if (args) {
+            args->Analyze();
+            for (auto *a : args->getStmts()) {
+                if (auto *v = dynamic_cast<VariableAST*>(a)) {
+                    argLine = v->getDeclLine();
+                    break;
+                }
+                if (auto *ar = dynamic_cast<ArrayLocExprAST*>(a)) {
+                    argLine = ar->getLine();   // add an accessor if needed
+                    break;
+                }
+            }
+        }
     }
 
     void prettyPrint(std::ostream &out, int indent = 0) override {
@@ -606,7 +619,9 @@ public:
             a->prettyPrint(out, 0);
             first = false;
         }
-        out << ") // using decl on line: " << declLine << "\n";
+        // use argLine if we captured one, otherwise fall back to function line
+        out << ") // using decl on line: "
+            << (argLine != -1 ? argLine : declLine) << "\n";
     }
 };
 
@@ -959,15 +974,18 @@ public:
     ~VarDefAST() { delete type; }
 
     void Analyze() override {
-        DecafType dtype = TYPE_UNKNOWN;
-        if (dynamic_cast<IntTypeAST*>(type)) dtype = TYPE_INT;
-        else if (dynamic_cast<BoolTypeAST*>(type)) dtype = TYPE_BOOL;
-        else if (dynamic_cast<StringTypeAST*>(type)) dtype = TYPE_STRING;
-        else if (dynamic_cast<VoidTypeAST*>(type)) dtype = TYPE_VOID;
+        DecafType dtype = astToType(type);
+
         if (!gSym.insert(name, dtype, getLine())) {
-            std::cerr << "Error: parameter '" << name << "' redeclared (line " << getLine() << ")\n";
+            std::cerr << "Error: parameter '" << name
+                      << "' redeclared (line " << getLine() << ")\n";
+        } else {
+            std::cerr << "defined variable: " << name
+                      << ", with type: "  << typeToString(dtype)
+                      << ", on line number: " << getLine() << '\n';
         }
     }
+
 
     std::string str() override {
         return "VarDef(" + name + "," + getString(type) + ")";
