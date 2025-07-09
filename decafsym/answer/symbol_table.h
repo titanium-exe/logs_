@@ -50,6 +50,10 @@ public:
         return true;
     }
 
+    void overwrite(const std::string &name, DecafType type, int line) {
+        table[name] = SymDescriptor(name, type, line);
+    }
+
     SymDescriptor* lookup(const std::string &name) {
         if (table.count(name)) return &table[name];
         return nullptr;
@@ -94,7 +98,11 @@ public:
         }
         return nullptr;
     }
-
+    void overwrite(const std::string &name, DecafType type, int line) {
+        if (scopes.empty()) push();
+        scopes.back().overwrite(name, type, line);
+    }
+    
     void print() const {
         std::cout << "===== Symbol Table Stack =====\n";
         for (int i = scopes.size() - 1; i >= 0; --i) {

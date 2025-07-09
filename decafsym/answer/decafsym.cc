@@ -398,16 +398,19 @@ public:
     ~VarDeclAST() { delete type; }
 
     void Analyze() override {
-      DecafType dtype = astToType(type);
-      if (!gSym.insert(name, dtype, getLine())) {
-          std::cerr << "Error: variable '" << name
-                    << "' redeclared (line " << getLine() << ")\n";
-      } else {                                   
-          std::cerr << "defined variable: " << name
-                    << ", with type: "  << typeToString(dtype)
-                    << ", on line number: " << getLine() << '\n';
-      }
+        DecafType dtype = astToType(type);
+        if (!gSym.insert(name, dtype, getLine())) {
+            std::cerr << "Error: parameter '" << name
+                      << "' redeclared (line " << getLine() << ")\n";
+        } else {                                        // <<< add block
+            std::cerr << "defined variable: " << name
+                      << ", with type: " << typeToString(dtype)
+                      << ", on line number: " << getLine() << '\n';
+        }
     }
+
+    
+
     void prettyPrint(std::ostream& out, int indent = 0) override {
       printIndent(out, indent);
       out << "var " << name << " ";
@@ -972,20 +975,20 @@ public:
     VarDefAST(const std::string& n, decafAST* t, int l)
         : decafAST(l), name(n), type(t) {}
     ~VarDefAST() { delete type; }
-
+    
     void Analyze() override {
         DecafType dtype = astToType(type);
 
         if (!gSym.insert(name, dtype, getLine())) {
-            std::cerr << "Error: parameter '" << name
-                      << "' redeclared (line " << getLine() << ")\n";
-        } else {
-            std::cerr << "defined variable: " << name
-                      << ", with type: "  << typeToString(dtype)
-                      << ", on line number: " << getLine() << '\n';
+            std::cerr << "Warning: redefining previously defined identifier: "
+                      << name << '\n';
+            gSym.overwrite(name, dtype, getLine());
         }
-    }
 
+        std::cerr << "defined variable: " << name
+                  << ", with type: "  << typeToString(dtype)
+                  << ", on line number: " << getLine() << '\n';
+    }
 
     std::string str() override {
         return "VarDef(" + name + "," + getString(type) + ")";
