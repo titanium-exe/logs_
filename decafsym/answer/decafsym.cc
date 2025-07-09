@@ -159,43 +159,47 @@ public:
   }
 
   void prettyPrint(std::ostream& out, int indent = 0) override {
+    // 1. Gather consecutive VarDeclAST nodes with same type and line
     auto it = stmts.begin();
     while (it != stmts.end()) {
+        // Try to group
         auto* firstVar = dynamic_cast<VarDeclAST*>(*it);
         if (firstVar) {
+            // Start group
             std::vector<std::string> names;
-            auto varType = firstVar->getTypeString();
+            names.push_back(firstVar->getName());
+            std::string type = firstVar->getTypeString();
             int line = firstVar->getLine();
 
-            names.push_back(firstVar->getName());
-
-            auto jt = it;
-            ++jt;
+            // Look ahead for more vars to group
+            auto jt = std::next(it);
             while (jt != stmts.end()) {
                 auto* nextVar = dynamic_cast<VarDeclAST*>(*jt);
-                if (nextVar && nextVar->getTypeString() == varType && nextVar->getLine() == line) {
+                if (nextVar && nextVar->getTypeString() == type && nextVar->getLine() == line) {
                     names.push_back(nextVar->getName());
                     ++jt;
                 } else {
                     break;
                 }
             }
-
+            // Print the group
             printIndent(out, indent);
             out << "var ";
             for (size_t i = 0; i < names.size(); ++i) {
                 if (i > 0) out << ", ";
                 out << names[i];
             }
-            out << " " << varType << "; \n";
-
-            it = jt;
+            out << " " << type << "; " << std::endl;
+            // Advance iterator
+            std::advance(it, names.size());
         } else {
+            // Not a var decl, just print as usual
             if (*it) (*it)->prettyPrint(out, indent);
             ++it;
         }
     }
   }
+
 
 
   string str()  override { return commaList<decafAST *>(stmts); }
