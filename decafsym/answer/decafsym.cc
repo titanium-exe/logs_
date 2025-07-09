@@ -402,7 +402,7 @@ public:
         if (!gSym.insert(name, dtype, getLine())) {
             std::cerr << "Error: parameter '" << name
                       << "' redeclared (line " << getLine() << ")\n";
-        } else {                                        // <<< add block
+        } else {                                        
             std::cerr << "defined variable: " << name
                       << ", with type: " << typeToString(dtype)
                       << ", on line number: " << getLine() << '\n';
@@ -415,7 +415,7 @@ public:
       printIndent(out, indent);
       out << "var " << name << " ";
       if (type) type->prettyPrint(out, 0);
-      out << ";\n";
+      out << "; \n";
     }
 
     std::string str() override {
@@ -478,7 +478,6 @@ public:
     gSym.pop();
     }
 
-    /* ------------ MethodBlockAST ------------- */
     void prettyPrint(std::ostream &out, int indent = 0) override
     {
         if (varList)  varList->prettyPrint(out, indent);
@@ -517,7 +516,7 @@ public:
     if (stmts) stmts->prettyPrint(out, indent+1);
     printIndent(out, indent); out << "}\n";
   }
-
+  
   string str() override  {
     return "Block(" + getString(varDecls) + "," + getString(stmts) + ")";
   }
@@ -554,24 +553,28 @@ public:
     gSym.pop();
   }
 
+
+ 
+
   void prettyPrint(std::ostream& out, int indent = 0) override {
-    printIndent(out, indent);
-    out << "func " << Name << "(";
-    if (Args) {
-        bool first = true;
-        for (auto *arg : Args->getStmts()) {
-            if (!first) out << ", ";
-            arg->prettyPrint(out, 0);
-            first = false;
-        }
-    }
-    out << ") ";
-    if (ReturnType) ReturnType->prettyPrint(out, 0); 
-    out << "{\n";                 
-    if (Block) Block->prettyPrint(out, indent + 1);
-    printIndent(out, indent);
-    out << "}\n";  
+      printIndent(out, indent + 1); 
+      out << "func " << Name << "(";
+      if (Args) {
+          bool first = true;
+          for (auto *arg : Args->getStmts()) {
+              if (!first) out << ", ";
+              arg->prettyPrint(out, 0);
+              first = false;
+          }
+      }
+      out << ") ";
+      if (ReturnType) ReturnType->prettyPrint(out, 0);
+      out << " {\n";
+      if (Block) Block->prettyPrint(out, indent + 3); 
+      printIndent(out, indent + 1);
+      out << "}\n";
   }
+
 
   string str()  override {
     return string("Method") + "(" + Name + "," + getString(ReturnType) + "," + getString(Args) + "," + getString(Block) + ")";
@@ -593,11 +596,10 @@ public:
 
     ~MethodCallAST() { delete args; }
     void Analyze() override {
-        // store function line (still useful for error checking)
+        
         if (auto *sym = gSym.lookup(name))
             declLine = sym->lineDeclared;
 
-        // analyse arguments and remember first variable/array argument line
         if (args) {
             args->Analyze();
             for (auto *a : args->getStmts()) {
@@ -606,7 +608,7 @@ public:
                     break;
                 }
                 if (auto *ar = dynamic_cast<ArrayLocExprAST*>(a)) {
-                    argLine = ar->getLine();   // add an accessor if needed
+                    argLine = ar->getLine();  
                     break;
                 }
             }
@@ -622,10 +624,13 @@ public:
             a->prettyPrint(out, 0);
             first = false;
         }
-        // use argLine if we captured one, otherwise fall back to function line
         out << ") // using decl on line: "
             << (argLine != -1 ? argLine : declLine) << "\n";
+        out << ";";
     }
+
+
+
 };
 
 
