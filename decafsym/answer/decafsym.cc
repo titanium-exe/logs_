@@ -16,7 +16,6 @@ inline void printIndent(std::ostream& out, int indent) {
     for (int i = 0; i < indent; ++i) out << "  ";
 }
 
-
 class decafAST {
 protected:
     int line;
@@ -31,8 +30,6 @@ public:
 
 };
 
-
-
 string getString(decafAST *d) {
   if (d != NULL) {
     return d->str();
@@ -40,9 +37,6 @@ string getString(decafAST *d) {
     return string("None");
   }
 }
-
-
-
 
 template <class T>
 string commaList(list<T> vec) {
@@ -55,103 +49,6 @@ string commaList(list<T> vec) {
   }
   return s;
 }
-
-
-
-
-
-class decafStmtList : public decafAST {
-  std::list<decafAST *> stmts;
-public:
-  decafStmtList(int l = -1) : decafAST(l) {}
-  ~decafStmtList() {
-    for (auto *p : stmts) delete p;
-  }
-  int size() { return stmts.size(); }
-  void push_front(decafAST *e) { stmts.push_front(e); }
-  void push_back(decafAST *e) { stmts.push_back(e); }
-  const std::list<decafAST*>& getStmts() const { return stmts; }
-  void merge(decafStmtList *other) {
-    if (!other) return;
-    stmts.splice(stmts.end(), other->stmts);
-  }
-  void Analyze() override {
-    for (auto *stmt : stmts) if (stmt) stmt->Analyze();
-  }
-
-  void prettyPrint(std::ostream& out, int indent = 0) override {
-    for (auto *stmt : stmts) {
-        if (stmt) stmt->prettyPrint(out, indent);
-    }
-  }
-
-  string str()  override { return commaList<decafAST *>(stmts); }
-};
-
-
-
-
-
-class PackageAST : public decafAST {
-  string Name;
-  decafStmtList *FieldDeclList;
-  decafStmtList *MethodDeclList;
-public:
-  PackageAST(const std::string& name, decafStmtList* f, decafStmtList* m, int l) 
-      : decafAST(l), Name(name), FieldDeclList(f), MethodDeclList(m) {}
-  ~PackageAST() {
-    delete FieldDeclList;
-    delete MethodDeclList;
-  }
-  void Analyze() override {
-    gSym.push();
-    if (FieldDeclList) FieldDeclList->Analyze();
-    if (MethodDeclList) MethodDeclList->Analyze();
-    gSym.pop();
-  }
-  void prettyPrint(std::ostream& out, int indent = 0) override {
-    printIndent(out, indent); out << "package " << Name << " {\n";
-    if (FieldDeclList) FieldDeclList->prettyPrint(out, indent+1);
-    if (MethodDeclList) MethodDeclList->prettyPrint(out, indent+1);
-    printIndent(out, indent); out << "}\n";
-  }
-
-  string str()  override  {
-    return string("Package") + "(" + Name + "," + getString(FieldDeclList) + "," + getString(MethodDeclList) + ")";
-  }
-};
-
-
-
-
-
-class ProgramAST : public decafAST {
-  decafStmtList *ExternList;
-  PackageAST *PackageDef;
-public:
-   ProgramAST(decafStmtList *externs, PackageAST *c, int l)
-        : decafAST(l), ExternList(externs), PackageDef(c) {}
-  ~ProgramAST() {
-    delete ExternList;
-    delete PackageDef;
-  }
-  void Analyze() override {
-    gSym.push();
-    if (ExternList) ExternList->Analyze();
-    if (PackageDef) PackageDef->Analyze();
-    gSym.pop();
-  }
-  void prettyPrint(std::ostream& out, int indent = 0) override {
-    if (ExternList) ExternList->prettyPrint(out, indent);
-    if (PackageDef) PackageDef->prettyPrint(out, indent);
-  }
-
-  string str()  override  { return string("Program") + "(" + getString(ExternList) + "," + getString(PackageDef) + ")"; }
-};
-
-
-
-
 // Analyze for these ?? 
 class IntTypeAST : public decafAST {
 public:
@@ -186,6 +83,7 @@ public:
 };
 
 
+
 // Helper Functions 
 inline DecafType astToType(decafAST* t) {
 
@@ -196,6 +94,165 @@ inline DecafType astToType(decafAST* t) {
   return TYPE_UNKNOWN;
 }
 
+
+
+class VarDeclAST : public decafAST {
+    std::string name;
+    decafAST   *type;
+public:
+    VarDeclAST(const std::string& id, decafAST* t, int l)
+        : decafAST(l), name(id), type(t) {}
+    ~VarDeclAST() { delete type; }
+
+    void Analyze() override {
+        DecafType dtype = astToType(type);
+        if (!gSym.insert(name, dtype, getLine())) {
+            std::cerr << "Error: parameter '" << name
+                      << "' redeclared (line " << getLine() << ")\n";
+        } else {                                        
+            std::cerr << "defined variable: " << name
+                      << ", with type: " << typeToString(dtype)
+                      << ", on line number: " << getLine() << '\n';
+        }
+    }
+    
+    std::string getName()  const { return name; }
+    std::string getTypeString() const {
+        if (dynamic_cast<IntTypeAST*>(type))    return "int";
+        if (dynamic_cast<BoolTypeAST*>(type))   return "bool";
+        if (dynamic_cast<StringTypeAST*>(type)) return "string";
+        return "unknown";
+    }
+
+    
+
+    void prettyPrint(std::ostream& out, int indent = 0) override {
+      printIndent(out, indent);
+      out << "var " << name << " ";
+      if (type) type->prettyPrint(out, 0);
+      out << "; \n";
+    }
+
+    std::string str() override {
+        return "VarDef(" + name + "," + getString(type) + ")";
+    }
+};
+
+
+class decafStmtList : public decafAST {
+  std::list<decafAST *> stmts;
+public:
+  decafStmtList(int l = -1) : decafAST(l) {}
+  ~decafStmtList() {
+    for (auto *p : stmts) delete p;
+  }
+  int size() { return stmts.size(); }
+  void push_front(decafAST *e) { stmts.push_front(e); }
+  void push_back(decafAST *e) { stmts.push_back(e); }
+  const std::list<decafAST*>& getStmts() const { return stmts; }
+  void merge(decafStmtList *other) {
+    if (!other) return;
+    stmts.splice(stmts.end(), other->stmts);
+  }
+  void Analyze() override {
+    for (auto *stmt : stmts) if (stmt) stmt->Analyze();
+  }
+
+  void prettyPrint(std::ostream& out, int indent = 0) override {
+    auto it = stmts.begin();
+    while (it != stmts.end()) {
+        auto* firstVar = dynamic_cast<VarDeclAST*>(*it);
+        if (firstVar) {
+            std::vector<std::string> names;
+            auto varType = firstVar->getTypeString();
+            int line = firstVar->getLine();
+
+            names.push_back(firstVar->getName());
+
+            auto jt = it;
+            ++jt;
+            while (jt != stmts.end()) {
+                auto* nextVar = dynamic_cast<VarDeclAST*>(*jt);
+                if (nextVar && nextVar->getTypeString() == varType && nextVar->getLine() == line) {
+                    names.push_back(nextVar->getName());
+                    ++jt;
+                } else {
+                    break;
+                }
+            }
+
+            printIndent(out, indent);
+            out << "var ";
+            for (size_t i = 0; i < names.size(); ++i) {
+                if (i > 0) out << ", ";
+                out << names[i];
+            }
+            out << " " << varType << "; \n";
+
+            it = jt;
+        } else {
+            if (*it) (*it)->prettyPrint(out, indent);
+            ++it;
+        }
+    }
+  }
+
+
+  string str()  override { return commaList<decafAST *>(stmts); }
+};
+
+class PackageAST : public decafAST {
+  string Name;
+  decafStmtList *FieldDeclList;
+  decafStmtList *MethodDeclList;
+public:
+  PackageAST(const std::string& name, decafStmtList* f, decafStmtList* m, int l) 
+      : decafAST(l), Name(name), FieldDeclList(f), MethodDeclList(m) {}
+  ~PackageAST() {
+    delete FieldDeclList;
+    delete MethodDeclList;
+  }
+  void Analyze() override {
+    gSym.push();
+    if (FieldDeclList) FieldDeclList->Analyze();
+    if (MethodDeclList) MethodDeclList->Analyze();
+    gSym.pop();
+  }
+  void prettyPrint(std::ostream& out, int indent = 0) override {
+    printIndent(out, indent); out << "package " << Name << " {\n";
+    if (FieldDeclList) FieldDeclList->prettyPrint(out, indent+1);
+    if (MethodDeclList) MethodDeclList->prettyPrint(out, indent+1);
+    printIndent(out, indent); out << "}\n";
+  }
+
+  string str()  override  {
+    return string("Package") + "(" + Name + "," + getString(FieldDeclList) + "," + getString(MethodDeclList) + ")";
+  }
+};
+
+class ProgramAST : public decafAST {
+  decafStmtList *ExternList;
+  PackageAST *PackageDef;
+public:
+   ProgramAST(decafStmtList *externs, PackageAST *c, int l)
+        : decafAST(l), ExternList(externs), PackageDef(c) {}
+  ~ProgramAST() {
+    delete ExternList;
+    delete PackageDef;
+  }
+  void Analyze() override {
+    gSym.push();
+    if (ExternList) ExternList->Analyze();
+    if (PackageDef) PackageDef->Analyze();
+    gSym.pop();
+  }
+  void prettyPrint(std::ostream& out, int indent = 0) override {
+    if (ExternList) ExternList->prettyPrint(out, indent);
+    if (PackageDef) PackageDef->prettyPrint(out, indent);
+  }
+
+  string str()  override  { return string("Program") + "(" + getString(ExternList) + "," + getString(PackageDef) + ")"; }
+};
 
 
 class FieldDeclAST : public decafAST {
@@ -250,9 +307,6 @@ public:
 };
 
 
-
-
-
 class FieldDeclArrayAST : public decafAST {
     std::string Name;
     decafAST   *Type;
@@ -288,8 +342,6 @@ public:
 };
 
 
-
-
 class ArrayLocExprAST : public decafAST {
     std::string name;  decafAST *index;   int declLine = -1;      
 public:
@@ -308,10 +360,6 @@ public:
         return "ArrayLocExpr(" + name + "," + getString(index) + ")";
     }
 };
-
-
-
-
 
 class AssignArrayLocAST : public decafAST {
     std::string name;  decafAST *index;  decafAST *expr;   int declLine = -1;      
@@ -343,11 +391,6 @@ public:
     }
 };
 
-
-
-
-
-
 class ArrayFieldDeclAST : public FieldDeclAST {
 public:
     using FieldDeclAST::FieldDeclAST;   // inherit ctor
@@ -355,10 +398,6 @@ public:
         return "ArrayFieldDecl" + FieldDeclAST::str().substr(10);
     }
 };
-
-
-
-
 
 
 class VariableAST : public decafAST {
@@ -387,41 +426,6 @@ public:
     std::string str() override { return "VariableExpr(" + Name + ")"; }
 };
 
-
-
-class VarDeclAST : public decafAST {
-    std::string name;
-    decafAST   *type;
-public:
-    VarDeclAST(const std::string& id, decafAST* t, int l)
-        : decafAST(l), name(id), type(t) {}
-    ~VarDeclAST() { delete type; }
-
-    void Analyze() override {
-        DecafType dtype = astToType(type);
-        if (!gSym.insert(name, dtype, getLine())) {
-            std::cerr << "Error: parameter '" << name
-                      << "' redeclared (line " << getLine() << ")\n";
-        } else {                                        
-            std::cerr << "defined variable: " << name
-                      << ", with type: " << typeToString(dtype)
-                      << ", on line number: " << getLine() << '\n';
-        }
-    }
-
-    
-
-    void prettyPrint(std::ostream& out, int indent = 0) override {
-      printIndent(out, indent);
-      out << "var " << name << " ";
-      if (type) type->prettyPrint(out, 0);
-      out << "; \n";
-    }
-
-    std::string str() override {
-        return "VarDef(" + name + "," + getString(type) + ")";
-    }
-};
 
 
 class AssignAST : public decafAST {
@@ -453,10 +457,6 @@ public:
         out << "; // using decl on line: " << declLine << "\n\n";
     }
 };
-
-
-
-
 
 class MethodBlockAST : public decafAST {
     decafStmtList* varList;
@@ -522,11 +522,6 @@ public:
   }
 };
 
-
-
-
-
-
 class MethodDeclAST : public decafAST {
   string Name;
   decafStmtList *Args;
@@ -552,9 +547,6 @@ public:
     if (Block) Block->Analyze();
     gSym.pop();
   }
-
-
- 
 
   void prettyPrint(std::ostream& out, int indent = 0) override {
       printIndent(out, indent + 1); 
@@ -628,12 +620,7 @@ public:
             << (argLine != -1 ? argLine : declLine) << "\n";
         out << ";";
     }
-
-
-
 };
-
-
 
 
 class ContinueStmtAST : public decafAST {
@@ -645,8 +632,6 @@ class ContinueStmtAST : public decafAST {
     }
 
 };
-
-
 
 class IntConstantAST : public decafAST {
     int Value;
@@ -662,11 +647,6 @@ public:
     }
 
 };
-
-
-
-
-
 
 class UnaryMinusAST : public decafAST {
     decafAST *Expr;
@@ -688,11 +668,6 @@ public:
 
 };
 
-
-
-
-
-
 class NotAST : public decafAST {
     decafAST *Expr;
 public:
@@ -710,8 +685,6 @@ public:
       if (Expr) Expr->prettyPrint(out, 0);
     }
 };
-
-
 
 class CharConstantAST : public decafAST {
     char val;
@@ -745,10 +718,6 @@ public:
 };
 
 
-
-
-
-
 class TypeOnlyVarDefAST : public decafAST {
   decafAST *type;
 public:
@@ -760,8 +729,6 @@ public:
   }
 
 };
-
-
 
 class BoolConstantAST : public decafAST {
     bool Value;
@@ -776,11 +743,6 @@ public:
     }
 
 };
-
-
-
-
-
 
 class AssignGlobalVarAST : public decafAST {
     std::string name;
@@ -814,10 +776,6 @@ public:
     }
 };
 
-
-
-
-
 class WhileStmtAST : public decafAST {
   decafAST *cond;
   decafAST *stmt;
@@ -847,10 +805,6 @@ public:
 
 };
 
-
-
-
-
 class BreakStmtAST : public decafAST {
 public:
   BreakStmtAST(int l) : decafAST(l) {}
@@ -860,9 +814,6 @@ public:
   }
 
 };
-
-
-
 
 class IfStmtAST : public decafAST {
   decafAST *cond, *thenBlk, *elseBlk;
@@ -895,11 +846,6 @@ public:
   } 
 };
 
-
-
-
-
-
 class ReturnStmtAST : public decafAST {
   decafAST *value;
 public:
@@ -919,9 +865,6 @@ public:
   }
 
 };
-
-
-
 
 class ExternFunctionAST : public decafAST {
     std::string    name;
@@ -968,11 +911,6 @@ public:
     }
 };
 
-
-
-
-
-
 class VarDefAST : public decafAST {
     std::string name;
     decafAST   *type;
@@ -1004,9 +942,6 @@ public:
         return "VarDef(" + name + "," + getString(type) + ")";
     }
 };
-
-
-
 
 class ForStmtAST : public decafAST {
     decafAST *init;
@@ -1042,7 +977,6 @@ public:
     }
 
 };
-
 
 
 #define MAKE_BINOP_CLASS(CLASSNAME, LABEL, OPSTR)                \
