@@ -979,16 +979,21 @@ public:
     void Analyze() override {
         DecafType dtype = astToType(type);
 
-        if (!gSym.insert(name, dtype, getLine())) {
+        if (gSym.lookup(name)) { 
             std::cerr << "Warning: redefining previously defined identifier: "
                       << name << '\n';
             gSym.overwrite(name, dtype, getLine());
+        } else {
+            gSym.insert(name, dtype, getLine());
         }
 
         std::cerr << "defined variable: " << name
                   << ", with type: "  << typeToString(dtype)
                   << ", on line number: " << getLine() << '\n';
     }
+
+    
+
 
     std::string str() override {
         return "VarDef(" + name + "," + getString(type) + ")";
