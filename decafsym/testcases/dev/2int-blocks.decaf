@@ -11,6 +11,7 @@ package C {
           print_int(x);
           print_int(y);
 		} 
+		 print_int(y);
 	  }
 	}
 }

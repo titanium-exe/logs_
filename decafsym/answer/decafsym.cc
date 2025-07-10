@@ -26,7 +26,7 @@ public:
     virtual void Analyze() {}
     virtual void prettyPrint(std::ostream& out, int indent = 0) {}
     int getLine() const { return line; }
-
+    void setLine(int l) { line = l; }
 
 };
 
@@ -49,6 +49,7 @@ string commaList(list<T> vec) {
   }
   return s;
 }
+
 // Analyze for these ?? 
 class IntTypeAST : public decafAST {
 public:
@@ -95,7 +96,6 @@ inline DecafType astToType(decafAST* t) {
 }
 
 
-
 class VarDeclAST : public decafAST {
     std::string name;
     decafAST   *type;
@@ -116,16 +116,6 @@ public:
         }
     }
     
-    std::string getName()  const { return name; }
-    std::string getTypeString() const {
-        if (dynamic_cast<IntTypeAST*>(type))    return "int";
-        if (dynamic_cast<BoolTypeAST*>(type))   return "bool";
-        if (dynamic_cast<StringTypeAST*>(type)) return "string";
-        return "unknown";
-    }
-
-    
-
     void prettyPrint(std::ostream& out, int indent = 0) override {
       printIndent(out, indent);
       out << "var " << name << " ";
@@ -157,53 +147,16 @@ public:
   void Analyze() override {
     for (auto *stmt : stmts) if (stmt) stmt->Analyze();
   }
-
+ 
   void prettyPrint(std::ostream& out, int indent = 0) override {
-    // 1. Gather consecutive VarDeclAST nodes with same type and line
-    auto it = stmts.begin();
-    while (it != stmts.end()) {
-        // Try to group
-        auto* firstVar = dynamic_cast<VarDeclAST*>(*it);
-        if (firstVar) {
-            // Start group
-            std::vector<std::string> names;
-            names.push_back(firstVar->getName());
-            std::string type = firstVar->getTypeString();
-            int line = firstVar->getLine();
-
-            // Look ahead for more vars to group
-            auto jt = std::next(it);
-            while (jt != stmts.end()) {
-                auto* nextVar = dynamic_cast<VarDeclAST*>(*jt);
-                if (nextVar && nextVar->getTypeString() == type && nextVar->getLine() == line) {
-                    names.push_back(nextVar->getName());
-                    ++jt;
-                } else {
-                    break;
-                }
-            }
-            // Print the group
-            printIndent(out, indent);
-            out << "var ";
-            for (size_t i = 0; i < names.size(); ++i) {
-                if (i > 0) out << ", ";
-                out << names[i];
-            }
-            out << " " << type << "; " << std::endl;
-            // Advance iterator
-            std::advance(it, names.size());
-        } else {
-            // Not a var decl, just print as usual
-            if (*it) (*it)->prettyPrint(out, indent);
-            ++it;
-        }
+    for (auto *stmt : stmts) {
+        if (stmt) stmt->prettyPrint(out, indent);
     }
   }
 
-
-
   string str()  override { return commaList<decafAST *>(stmts); }
 };
+
 
 class PackageAST : public decafAST {
   string Name;
@@ -234,6 +187,7 @@ public:
   }
 };
 
+
 class ProgramAST : public decafAST {
   decafStmtList *ExternList;
   PackageAST *PackageDef;
@@ -257,6 +211,7 @@ public:
 
   string str()  override  { return string("Program") + "(" + getString(ExternList) + "," + getString(PackageDef) + ")"; }
 };
+
 
 
 class FieldDeclAST : public decafAST {
@@ -365,6 +320,7 @@ public:
     }
 };
 
+
 class AssignArrayLocAST : public decafAST {
     std::string name;  decafAST *index;  decafAST *expr;   int declLine = -1;      
 public:
@@ -397,7 +353,7 @@ public:
 
 class ArrayFieldDeclAST : public FieldDeclAST {
 public:
-    using FieldDeclAST::FieldDeclAST;   // inherit ctor
+    using FieldDeclAST::FieldDeclAST;   
     std::string str()  override  {                
         return "ArrayFieldDecl" + FieldDeclAST::str().substr(10);
     }
@@ -431,7 +387,6 @@ public:
 };
 
 
-
 class AssignAST : public decafAST {
     std::string Name;
     decafAST   *Expr;
@@ -461,6 +416,7 @@ public:
         out << "; // using decl on line: " << declLine << "\n\n";
     }
 };
+
 
 class MethodBlockAST : public decafAST {
     decafStmtList* varList;
@@ -496,6 +452,7 @@ public:
     }
 };
 
+
 class BlockAST : public decafAST {
   decafStmtList* varDecls;
   decafStmtList* stmts;
@@ -525,6 +482,7 @@ public:
     return "Block(" + getString(varDecls) + "," + getString(stmts) + ")";
   }
 };
+
 
 class MethodDeclAST : public decafAST {
   string Name;
@@ -774,6 +732,15 @@ public:
         if (init) init->Analyze();
     }
 
+    void prettyPrint(std::ostream& out,int indent=0) override{
+        printIndent(out,indent);
+        out<<"var "<<name<<" ";
+        if(type)  type->prettyPrint(out,0);
+        out<<" = ";
+        if(init)  init->prettyPrint(out,0);
+        out<<";\n";
+    }
+
     std::string str() override {
         return "AssignGlobalVar(" + name + "," +
                getString(type) + "," + getString(init) + ")";
@@ -923,24 +890,27 @@ public:
         : decafAST(l), name(n), type(t) {}
     ~VarDefAST() { delete type; }
     
-    void Analyze() override {
+    void Analyze() override{
         DecafType dtype = astToType(type);
 
-        if (gSym.lookup(name)) { 
-            std::cerr << "Warning: redefining previously defined identifier: "
-                      << name << '\n';
-            gSym.overwrite(name, dtype, getLine());
-        } else {
-            gSym.insert(name, dtype, getLine());
+        // try to put the parameter into *current* scope
+        if (!gSym.insert(name, dtype, getLine()))     // insert looks only at top scope
+        {
+            std::cerr << "Error: parameter '" << name
+                      << "' redeclared (line " << getLine() << ")\n";
         }
 
+        // optional trace – delete if you don’t want the extra output
         std::cerr << "defined variable: " << name
                   << ", with type: "  << typeToString(dtype)
                   << ", on line number: " << getLine() << '\n';
     }
 
-    
-
+    void prettyPrint(std::ostream& out, int /*indent*/ = 0) override {
+      out << name << " ";
+      if (type) type->prettyPrint(out, 0);
+    }
+  
 
     std::string str() override {
         return "VarDef(" + name + "," + getString(type) + ")";
@@ -1021,3 +991,4 @@ MAKE_BINOP_CLASS(EqualAST,       "Eq",           "==")
 MAKE_BINOP_CLASS(NotEqualAST,    "Neq",          "!=")
 MAKE_BINOP_CLASS(AndAST,         "And",          "&&")
 MAKE_BINOP_CLASS(OrAST,          "Or",           "||")
+
